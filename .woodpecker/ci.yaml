@@ -1,0 +1,121 @@
+# Roadrunner CI (Woodpecker + Dagger, https://cicd.apps.example.com): port of .github/workflows/ci.yml — every job: test (uv sync --extra dev, ruff check, pytest -q) on Python 3.11 and 3.12, safety-invariants (tool annotations + README tool count), build (uv build + wheel contents).
+# The suite is mock-only (tests/conftest.py fails any non-loopback socket). The build job's
+# upload-artifact (dist/) is dropped (GitHub-only); the wheel check still runs.
+# `$$` escapes `$` for Woodpecker. Docs: https://cicd.docs.example.com/roadrunner/
+labels:
+  tier: "0"
+when:
+  - event: pull_request
+  - event: [push, manual]
+    branch: main
+steps:
+  - name: test-py3.11
+    image: bash
+    depends_on: []
+    environment:
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://192.0.2.1:4318/v1/logs
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: http/protobuf
+    commands:
+      - >-
+        ci-runner v0.10.1 python-uv --src=. --repo="$${CI_REPO_NAME,,}" --python=3.11
+        --sync-args=--extra=dev --checks=ruff,pytest
+        --dep-cache=registry.dev.example.com/cache
+        --dep-cache-password=file:///etc/ci/cache-password --test-workers=2
+  - name: test-py3.12
+    image: bash
+    depends_on: []
+    environment:
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://192.0.2.1:4318/v1/logs
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: http/protobuf
+    commands:
+      - >-
+        ci-runner v0.10.1 python-uv --src=. --repo="$${CI_REPO_NAME,,}" --python=3.12
+        --sync-args=--extra=dev --checks=ruff,pytest
+        --dep-cache=registry.dev.example.com/cache
+        --dep-cache-password=file:///etc/ci/cache-password --test-workers=2
+  - name: safety-invariants
+    image: bash
+    depends_on: []
+    environment:
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://192.0.2.1:4318/v1/logs
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: http/protobuf
+    commands:
+      - |
+        ci-runner v0.10.1 python-uv --src=. --repo="$${CI_REPO_NAME,,}" --python=3.12 \
+        --sync-args=--extra=dev \
+        --env=QIDI_TEST_MODE=1,QIDI_READ_ONLY=1 \
+        --run='uv run --no-sync python scripts/introspect.py > /tmp/tools.json
+        uv run --no-sync python - <<"PY"
+        import json, pathlib, re, sys
+
+        data = json.loads(pathlib.Path("/tmp/tools.json").read_text())
+        tools = data["tools"]
+        total = len(tools)
+        read_only = sum(1 for t in tools if t["read_only"])
+        destructive = sum(1 for t in tools if t["destructive"])
+        unannotated = [t["name"] for t in tools if t.get("read_only") is None]
+        print(f"{total} tools, {read_only} read-only, {destructive} destructive-annotated")
+
+        problems = []
+        if unannotated:
+            # An unannotated tool is invisible to the read-only sweep in
+            # tests/test_safety.py, so it could mutate the printer unchecked.
+            problems.append(f"unannotated tools: {unannotated}")
+
+        # A doc that confidently names a tool count the server does not have is
+        # worse than no doc. README.md is the one place that count is written.
+        text = pathlib.Path("README.md").read_text()
+        found = re.search(r"(\d+) tools in \w+ modules", text)
+        if not found:
+            problems.append("README.md: could not find the tool count to verify")
+        elif int(found.group(1)) != total:
+            problems.append(f"README.md claims {found.group(1)} tools, server has {total}")
+
+        # emergency_stop carries the destructive *annotation* (it does destroy the
+        # print) but must never be token-gated. The behavioural half of this is
+        # tested in tests/test_safety.py; here we only assert it still exists and
+        # is not mislabelled as a read-only tool.
+        stop = next((t for t in tools if t["name"] == "emergency_stop"), None)
+        if stop is None:
+            problems.append("emergency_stop is missing entirely")
+        elif stop["read_only"]:
+            problems.append("emergency_stop is annotated read-only, which is a lie")
+
+        if problems:
+            sys.exit("safety invariants failed:\n  " + "\n  ".join(problems))
+        print("safety invariants hold")
+        PY' \
+        --dep-cache=registry.dev.example.com/cache \
+        --dep-cache-password=file:///etc/ci/cache-password --test-workers=2
+  - name: build
+    image: bash
+    depends_on: []
+    environment:
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://192.0.2.1:4318/v1/logs
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: http/protobuf
+    commands:
+      - |
+        ci-runner v0.10.1 python-uv --src=. --repo="$${CI_REPO_NAME,,}" --python=3.12 \
+        --run='uv build
+        uv run --no-sync python - <<"PY"
+        import glob, sys, zipfile
+
+        wheel = glob.glob("dist/*.whl")[0]
+        names = zipfile.ZipFile(wheel).namelist()
+        entry = next((n for n in names if n.endswith("entry_points.txt")), None)
+        text = zipfile.ZipFile(wheel).read(entry).decode() if entry else ""
+        missing = [
+            what
+            for what, ok in (
+                ("qidi-mcp entry point", "qidi-mcp =" in text),
+                ("qidi-dashboard entry point", "qidi-dashboard =" in text),
+                ("dashboard_page module", any("dashboard_page.py" in n for n in names)),
+            )
+            if not ok
+        ]
+        if missing:
+            sys.exit(f"wheel {wheel} is missing: {missing}")
+        print(f"{wheel} is complete")
+        PY' \
+        --dep-cache=registry.dev.example.com/cache \
+        --dep-cache-password=file:///etc/ci/cache-password --test-workers=2
