@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Template. Paste the 'qidi' block into your MCP client's server list,",
+    "then replace /ABSOLUTE/PATH/TO/qidi-max4-mcp with your checkout and set the printer address.",
+    "",
+    "Easier: run  .venv/bin/python scripts/mcp_entry.py  and it prints this block with the",
+    "real paths for your checkout already resolved.",
+    "",
+    "Keep QIDI_READ_ONLY=1 until you have read docs/guides/going-live.md:",
+    "https://github.com/couplet-physical-ai/qidi-max4-mcp/blob/main/docs/guides/going-live.md",
+    "",
+    "No printer yet? Point QIDI_PRINTER_URL at the bundled mock instead:",
+    "  uv run python scripts/run_mock_printer.py"
+  ],
+  "mcpServers": {
+    "qidi": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/qidi-max4-mcp/.venv/bin/python",
+      "args": ["-m", "qidi_mcp.server"],
+      "cwd": "/ABSOLUTE/PATH/TO/qidi-max4-mcp",
+      "env": {
+        "QIDI_PRINTER_URL": "http://192.0.2.10:7125",
+        "QIDI_READ_ONLY": "1",
+        "QIDI_AUDIT_LOG": "/ABSOLUTE/PATH/TO/qidi-max4-mcp/audit.jsonl"
+      }
+    }
+  }
+}

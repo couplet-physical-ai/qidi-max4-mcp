@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.env
+*.log
+
+# Runtime audit trail written by the server at run time (may contain the
+# printer's hostname/IP and a record of every action taken). The security
+# REVIEW documents live in docs/security/ and are deliberately tracked --
+# an earlier "audit/" rule silently excluded them, which would have thrown
+# away the proof-carrying analysis behind most of the safety fixes.
+audit/
+audit.jsonl
+*.jsonl
+
+# Ad-hoc webcam grabs pulled from the printer while debugging. Deliberately a
+# root-level, name-scoped rule rather than a blanket *.jpg: the dashboard
+# screenshots under docs/assets/ ARE tracked, and the docs build asserts they
+# exist, so an over-broad image rule would silently break the published site.
+/webcam-*.jpg
+/benchy-*.jpg
+/snapshot-*.jpg
+/bed-*.jpg
+/diag-*.jpg
+/crop-diag-*.png
+
+# Research fetch helpers: contain a personal token path / proxy workarounds
+research/fetch.sh
+research/gh.py
+site/
+.mkdocs-build/

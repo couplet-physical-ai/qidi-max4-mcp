@@ -1,0 +1,66 @@
+[project]
+name = "qidi-mcp"
+version = "2.0.1"
+description = "MCP server for QIDI Max4 (Klipper/Moonraker) 3D printers — safety-gated printer control for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27",
+    "websockets>=12.0",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "aiohttp>=3.9",          # mock Moonraker server (HTTP + WebSocket in one)
+    "ruff>=0.4",
+]
+
+[project.scripts]
+qidi-mcp = "qidi_mcp.server:main"
+qidi-dashboard = "qidi_mcp.dashboard:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["qidi_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Explicit, because pytest-asyncio >= 1.4.1 warns when it is unset, and the
+# DeprecationWarning filter below turns that warning into an error before a single
+# test is collected.
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Optional GPLv3 source fetched via scripts/fetch_upstream_sources.sh is
+# Git-ignored and never part of the installed or distributed package.
+extend-exclude = [
+    "research/upstream",
+    # Adversarial-audit proof scripts, kept verbatim as evidence for the security
+    # review. They are throwaway one-liner probes (star imports, semicolons), not
+    # library code, and rewriting them to satisfy the linter would weaken their
+    # value as a record of exactly what was run.
+    "docs/security/proofs",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Operator utilities, written deliberately compact (they insert cwd on sys.path
+# before importing the package, and pack a probe per line). Only the stylistic
+# codes are waived -- real defects (undefined names, unused bindings, bugbear)
+# are still enforced here, unlike a blanket exclude.
+"scripts/*.py" = ["E401", "E402", "E702", "I001", "SIM117"]

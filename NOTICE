@@ -1,0 +1,18 @@
+Copyright 2026 Exowatt, Inc.
+
+No third-party firmware, configs, parser, or documentation is distributed
+with this source. An optional fetch script retrieves GPL-3.0 Klipper,
+Moonraker and QIDI Max 4 reference sources directly from their respective
+upstream repositories into a Git-ignored directory for local proof checks.
+See research/upstream/README.md for pinned revisions and license links.
+
+`qidi_mcp/limits.py` independently reimplements Klipper's G-code
+command-name/parameter extraction (a few lines) for interoperability; no
+Klipper source file is included.
+
+"QIDI", "QIDI Max 4", and "Max4" are trademarks of their respective owner,
+Qidi Technology. This project is an independent, community-maintained tool
+and is not affiliated with, endorsed by, or sponsored by Qidi Technology.
+
+"Klipper" and "Moonraker" are the names of their respective upstream
+open-source projects; this project is not affiliated with either.

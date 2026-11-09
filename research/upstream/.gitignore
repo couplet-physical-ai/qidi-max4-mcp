@@ -1,0 +1,4 @@
+# Keep the provenance note, never distribute fetched upstream source/config.
+*
+!.gitignore
+!README.md
